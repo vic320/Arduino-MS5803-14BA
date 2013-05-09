@@ -6,7 +6,8 @@
 //  Created by Victor Konshin on 4/10/13.
 //
 //
-//  Copyright (c) 2013, Victor Konshin, Ayerware Publishing
+//  Copyright (c) 2013, Victor Konshin, info@ayerware.com
+//  for the DIY Dive Computer project www.diydivecomputer.com
 //  All rights reserved.
 
 //  Redistribution and use in source and binary forms, with or without
