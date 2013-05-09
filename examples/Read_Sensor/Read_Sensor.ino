@@ -32,11 +32,17 @@
 //  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <SPI.h>
+#include <Wire.h>
 #include <MS5803.h>
 
+// Chip Select pin for SPI
 #define SENSOR_CS_PIN 9
 
+// Use this constructor for SPI
 MS5803 sensor = MS5803(SENSOR_CS_PIN);
+
+// Use this constructor for i2c - Address is set in the library implementation file. Default is 0x76.
+//MS5803 sensor = MS5803();
 
 void setup() {
   // Start the serial ports.
