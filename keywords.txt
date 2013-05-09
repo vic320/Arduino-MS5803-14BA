@@ -1,0 +1,23 @@
+#######################################
+# Syntax Coloring Map MS5803
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+MS5803	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+initalizeSensor	KEYWORD2
+readSensor	KEYWORD2
+temperature	KEYWORD2
+pressure	KEYWORD2
+resetSensor	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
