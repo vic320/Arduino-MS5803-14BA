@@ -49,7 +49,7 @@
 #define SENSOR_CMD_ADC_2048   0x06
 #define SENSOR_CMD_ADC_4096   0x08
 
-#define SENSOR_I2C_ADDRESS    0x76
+#define SENSOR_I2C_ADDRESS    0x76 // If the CSB Pin (pin 3) is high, then the address is 0x76, if low, then it's 0x77
 
 static unsigned int      sensorCoefficients[8];           // calibration coefficients
 static unsigned long     D1                       = 0;    // Stores uncompensated pressure value
@@ -71,20 +71,21 @@ MS5803::MS5803() {
 
 boolean MS5803::initalizeSensor() {
     
-    pinMode( _cs, OUTPUT );
-    digitalWrite( _cs, HIGH );
-    
+    // Start the appropriate interface.
     if (interface) {
-    	SPI.begin(); //see SPI library details on arduino.cc for details
+        pinMode( _cs, OUTPUT );
+  	    digitalWrite( _cs, HIGH );
+    	SPI.begin();
    	    SPI.setBitOrder( MSBFIRST );
-   	    SPI.setClockDivider( SPI_CLOCK_DIV128 ); // Go fast or go home...
+   	    SPI.setClockDivider( SPI_CLOCK_DIV2 ); // Go fast or go home...
     } else {
         Wire.begin();
     }
     
-    // Read sensor coefficients - these will be used to convert sensor data into pressure and temp data
-    resetSensor(); // resetting the sensor on startup is important
-    
+    // resetting the sensor on startup is important
+    resetSensor(); 
+	
+	// Read sensor coefficients - these will be used to convert sensor data into pressure and temp data
     for (int i = 0; i < 8; i++ ){
         sensorCoefficients[ i ] = ms5803ReadCoefficient( i );  // read coefficients
         Serial.print("Coefficient = ");
@@ -94,29 +95,39 @@ boolean MS5803::initalizeSensor() {
     
     unsigned char p_crc = sensorCoefficients[ 7 ];
     unsigned char n_crc = ms5803CRC4( sensorCoefficients ); // calculate the CRC
+    
     // If the calculated CRC does not match the returned CRC, then there is a data integrity issue.
-    // Check the connections for bad solder joints or "flakey" cables. If this issue persists, you may have a bad sensor.
+    // Check the connections for bad solder joints or "flakey" cables. 
+    // If this issue persists, you may have a bad sensor.
     if ( p_crc != n_crc ) {
         return false;
     }
+    
     return true;
 }
 
 void MS5803::readSensor() {
-    D1 = ms5803CmdAdc( SENSOR_CMD_ADC_D1 + SENSOR_CMD_ADC_4096 );    // read uncompensated pressure
+
+	// If power or speed are important, you can change the ADC resolution to a lower value.
+	// Currently set to SENSOR_CMD_ADC_4096 - set to a lower defined value for lower resolution.
+	D1 = ms5803CmdAdc( SENSOR_CMD_ADC_D1 + SENSOR_CMD_ADC_4096 );    // read uncompensated pressure
     D2 = ms5803CmdAdc( SENSOR_CMD_ADC_D2 + SENSOR_CMD_ADC_4096 );    // read uncompensated temperature
-    // calculate 1st order pressure and temperature correction factors (MS5803 1st order algorithm)
+    
+    // calculate 1st order pressure and temperature correction factors (MS5803 1st order algorithm). 
     deltaTemp = D2 - sensorCoefficients[5] * pow( 2, 8 );
     sensorOffset = sensorCoefficients[2] * pow( 2, 16 ) + ( deltaTemp * sensorCoefficients[4] ) / pow( 2, 7 );
     sensitivity = sensorCoefficients[1] * pow( 2, 15 ) + ( deltaTemp * sensorCoefficients[3] ) / pow( 2, 8 );
+    
     // calculate 2nd order pressure and temperature (MS5803 2st order algorithm)
-    temp = ( 2000 + (deltaTemp * sensorCoefficients[6] ) / pow( 2, 23 ) ) / 100;
+    temp = ( 2000 + (deltaTemp * sensorCoefficients[6] ) / pow( 2, 23 ) ) / 100; 
     press = ( ( ( ( D1 * sensitivity ) / pow( 2, 21 ) - sensorOffset) / pow( 2, 15 ) ) / 10 );
+    
 }
 
 // Sends a power on reset command to the sensor.
 // Should be done at powerup and maybe on a periodic basis (needs to confirm with testing).
 void MS5803::resetSensor() {
+
 	if (interface) {
     	SPI.setDataMode( SPI_MODE3 );
    	 	digitalWrite( _cs, LOW );
@@ -139,7 +150,6 @@ unsigned int MS5803::ms5803ReadCoefficient(uint8_t index) {
     
     if (interface) {
     	SPI.setDataMode( SPI_MODE3 );
-    
     	digitalWrite( _cs, LOW );
     
     	// send the device the coefficient you want to read:
@@ -152,6 +162,7 @@ unsigned int MS5803::ms5803ReadCoefficient(uint8_t index) {
     
     	// take the chip select high to de-select:
     	digitalWrite( _cs, HIGH );
+    	
     } else {
 	    Wire.beginTransmission( SENSOR_I2C_ADDRESS );
         Wire.write( 0xA0 + ( index * 2 ) );
@@ -159,10 +170,9 @@ unsigned int MS5803::ms5803ReadCoefficient(uint8_t index) {
         Wire.requestFrom ( SENSOR_I2C_ADDRESS, 2 );
     	result = Wire.read();
     	result = result << 8;
-    	result |= Wire.read(); // and the second byte
+    	result |= Wire.read(); 
     }
     
-    //Serial.println (result);
     return( result );
 }
 
@@ -170,10 +180,12 @@ unsigned int MS5803::ms5803ReadCoefficient(uint8_t index) {
 // The value returned by this method should match the coefficient at index 7.
 // If not there is something works with the sensor or the connection.
 unsigned char MS5803::ms5803CRC4(unsigned int n_prom[]) {
+
     int cnt;
     unsigned int n_rem;
     unsigned int crc_read;
     unsigned char  n_bit;
+    
     n_rem = 0x00;
     crc_read = sensorCoefficients[7];
     sensorCoefficients[7] = ( 0xFF00 & ( sensorCoefficients[7] ) );
@@ -196,11 +208,13 @@ unsigned char MS5803::ms5803CRC4(unsigned int n_prom[]) {
     
     n_rem = ( 0x000F & ( n_rem >> 12 ) );// // final 4-bit reminder is CRC code
     sensorCoefficients[7] = crc_read; // restore the crc_read to its original place
+    
     return ( n_rem ^ 0x00 ); // The calculated CRC should match what the device initally returned.
 }
 
 // Use this method to send commands to the sensor.  Pretty much just used to read the pressure and temp data.
 unsigned long MS5803::ms5803CmdAdc(char cmd) {
+
     unsigned int result = 0;
     unsigned long returnedData = 0;
     
@@ -237,7 +251,9 @@ unsigned long MS5803::ms5803CmdAdc(char cmd) {
     	digitalWrite( _cs, HIGH );
     	delay(3);
     	digitalWrite( _cs, LOW );
+    	
     	SPI.transfer( SENSOR_CMD_ADC_READ );
+    	
     	returnedData = SPI.transfer( 0x00 );
     	result = 65536 * returnedData;
     	returnedData = SPI.transfer( 0x00 );
@@ -250,7 +266,8 @@ unsigned long MS5803::ms5803CmdAdc(char cmd) {
         Wire.beginTransmission( SENSOR_I2C_ADDRESS );
         Wire.write( SENSOR_CMD_ADC_READ );
         Wire.endTransmission();
-
+        
+        // Always read back three bytes (24 bits)
     	Wire.requestFrom ( SENSOR_I2C_ADDRESS, 3 );
     	returnedData = Wire.read();
     	result = 65536 * returnedData;
